@@ -23,6 +23,26 @@ function Test-Router {
     }
 }
 
+function Test-ModelsAvailable {
+    try {
+        $metrics = Invoke-RestMethod -Uri "$RouterUrl/metrics" -Method Get -TimeoutSec 5
+        # If all circuits are open, models are unavailable
+        $openCircuits = $metrics.circuit_breaker.open_circuits
+        return ($openCircuits.PSObject.Properties.Count -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Reset-Circuits {
+    try {
+        Invoke-RestMethod -Uri "$RouterUrl/circuit-breaker/reset-all" -Method Post -TimeoutSec 5 | Out-Null
+        Write-Log "Circuit breakers reset"
+    } catch {
+        Write-Log "Failed to reset circuits: $_"
+    }
+}
+
 function Start-Router {
     Write-Log "Router down, starting..."
     
@@ -45,4 +65,7 @@ function Start-Router {
 # Main
 if (-not (Test-Router)) {
     Start-Router
+} elseif (-not (Test-ModelsAvailable)) {
+    Write-Log "All models circuit-open, resetting circuits..."
+    Reset-Circuits
 }
