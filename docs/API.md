@@ -3,19 +3,14 @@
 ## Chat Completions
 
 ### POST /v1/chat/completions
-### POST /chat/completions (alias OpenClaw)
-
-Requête OpenAI-compatible.
+### POST /chat/completions
 
 **Request:**
 ```json
 {
   "model": "router",
-  "messages": [
-    {"role": "user", "content": "Hello"}
-  ],
-  "tools": [...],  // Optionnel
-  "temperature": 0.7
+  "messages": [{"role": "user", "content": "Hello"}],
+  "tools": [...]
 }
 ```
 
@@ -23,12 +18,30 @@ Requête OpenAI-compatible.
 ```json
 {
   "id": "gen-xxx",
-  "model": "z-ai/glm-5",
+  "model": "openrouter/z-ai/glm-5",
   "choices": [...],
-  "usage": {
-    "prompt_tokens": 10,
-    "completion_tokens": 20
-  }
+  "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+}
+```
+
+---
+
+## Providers
+
+### GET /providers
+
+Liste des providers configurés.
+
+**Response:**
+```json
+{
+  "providers": {
+    "openrouter": {"base_url": "...", "configured": true},
+    "openai": {"base_url": "...", "configured": false},
+    "anthropic": {"base_url": "...", "configured": true},
+    "ollama": {"base_url": "...", "configured": true}
+  },
+  "default_provider": "openrouter"
 }
 ```
 
@@ -38,45 +51,29 @@ Requête OpenAI-compatible.
 
 ### GET /health
 
-Health check basique.
-
-**Response:**
 ```json
 {
   "status": "healthy",
-  "service": "llm-router",
-  "version": "0.4.0",
-  "routing_mode": "hybrid",
+  "version": "0.5.0",
+  "providers": ["openrouter", "openai", "anthropic", "google", "ollama"],
   "categories": ["tools", "code", "reasoning", "conversation"]
 }
 ```
 
 ### GET /metrics
 
-Métriques complètes.
-
-**Response:**
 ```json
 {
-  "requests": {
-    "total": 100,
-    "success": 98,
-    "failed": 2
-  },
-  "avg_latency_ms": 1234.56,
+  "requests": {"total": 100, "success": 98, "failed": 2},
+  "avg_latency_ms": 1234,
   "total_cost_usd": 0.45,
-  "model_distribution": {"glm-5": 50, "kimi-k2.5": 48},
-  "category_distribution": {"code": 60, "conversation": 38},
-  "routing_mode_distribution": {"ollama": 80, "keywords": 18},
-  "circuit_breaker": {
-    "failures": {},
-    "open_circuits": {},
-    "config": {
-      "failure_threshold": 3,
-      "recovery_timeout_sec": 300
-    }
+  "model_distribution": {...},
+  "provider_distribution": {
+    "openrouter": 60,
+    "openai": 30,
+    "ollama": 10
   },
-  "recent_requests": [...]
+  "circuit_breaker": {...}
 }
 ```
 
@@ -86,53 +83,19 @@ Métriques complètes.
 
 ### GET /config
 
-Configuration actuelle.
-
-**Response:**
-```json
-{
-  "routing_mode": "hybrid",
-  "ollama": {"base_url": "...", "model": "qwen2.5:0.5b"},
-  "model_mappings": {...},
-  "keywords": {...},
-  "model_costs": {...}
-}
-```
-
 ### POST /config/category
 
-Créer ou modifier une catégorie.
-
-**Request:**
 ```json
-{
-  "name": "creative",
-  "models": ["moonshotai/kimi-k2.5"],
-  "keywords": ["story", "poem"],
-  "description": "Creative writing"
-}
-```
-
-**Response:**
-```json
-{"status": "ok", "category": "creative", "models": [...]}
+{"name": "creative", "models": ["openrouter/kimi-k2.5"], "keywords": ["story"]}
 ```
 
 ### POST /config/model-mapping
 
-Modifier les modèles d'une catégorie.
-
-**Request:**
 ```json
-{
-  "category": "code",
-  "models": ["glm-5", "kimi-k2.5", "gpt-4o-mini"]
-}
+{"category": "code", "models": ["openai/gpt-4o", "anthropic/claude-3-sonnet"]}
 ```
 
 ### DELETE /config/category/{name}
-
-Supprimer une catégorie personnalisée.
 
 ---
 
@@ -140,12 +103,7 @@ Supprimer une catégorie personnalisée.
 
 ### POST /circuit-breaker/reset/{model}
 
-Reset un modèle spécifique.
-
-**Example:**
-```bash
-curl -X POST http://localhost:3456/circuit-breaker/reset/moonshotai/kimi-k2.5
-```
+Reset un modèle: `POST /circuit-breaker/reset/openai/gpt-4o`
 
 ### POST /circuit-breaker/reset-all
 
@@ -155,8 +113,8 @@ Reset tous les circuits.
 
 ## Codes d'erreur
 
-| Code | Cause | Solution |
-|------|-------|----------|
-| 422 | Validation error | Voir `validation_errors.log` |
-| 500 | All models failed | Reset circuit breaker |
-| 503 | Service unavailable | Vérifier si router actif |
+| Code | Cause |
+|------|-------|
+| 422 | Validation error |
+| 500 | All models failed |
+| 503 | Service unavailable |

@@ -1,6 +1,6 @@
 # LLM Router
 
-> Service de routage intelligent pour les requêtes LLM. Choix automatique du meilleur modèle selon le type de tâche.
+> Service de routage intelligent multi-provider pour les requêtes LLM.
 
 ## Démarrage rapide
 
@@ -8,7 +8,7 @@
 cd service
 pip install -r requirements.txt
 cp .env.example .env
-# Éditer .env avec votre OPENROUTER_API_KEY
+# Éditer .env avec vos clés API
 uvicorn main:app --host 0.0.0.0 --port 3456
 ```
 
@@ -16,26 +16,32 @@ uvicorn main:app --host 0.0.0.0 --port 3456
 
 | Document | Description |
 |----------|-------------|
-| [**service/README.md**](service/README.md) | Guide d'utilisation et configuration pratique |
-| [**docs/CONFIGURATION.md**](docs/CONFIGURATION.md) | Configuration détaillée (modèles, routing, etc.) |
+| [**service/README.md**](service/README.md) | Guide d'utilisation |
+| [**docs/CONFIGURATION.md**](docs/CONFIGURATION.md) | Configuration détaillée |
 | [**docs/API.md**](docs/API.md) | Référence API REST |
-| [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) | Déploiement et maintenance |
+| [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) | Déploiement |
+
+## Providers supportés
+
+| Provider | Clé API requise | Coût |
+|----------|-----------------|------|
+| **OpenRouter** | `OPENROUTER_API_KEY` | Payant (varié) |
+| **OpenAI** | `OPENAI_API_KEY` | Payant |
+| **Anthropic** | `ANTHROPIC_API_KEY` | Payant |
+| **Google** | `GOOGLE_API_KEY` | Payant |
+| **Ollama** | Aucune | Gratuit (local) |
 
 ## Fonctionnalités
 
-- **Routing intelligent** via Ollama local ou API
-- **Circuit breaker** avec persistence
-- **Métriques de coût** en temps réel
-- **Catégories personnalisables** via API
-- **Support multimodal** (text, images)
+- ✅ **Multi-provider** - Mixez OpenRouter, OpenAI, Anthropic, Google, Ollama
+- ✅ **Routing intelligent** via Ollama local ou API
+- ✅ **Circuit breaker** persistant
+- ✅ **Métriques de coût** temps réel
+- ✅ **Catégories personnalisables**
 
-## État du projet
+## Version
 
-| Phase | Status |
-|-------|--------|
-| Phase 1: Forward-only | ✅ |
-| Phase 2: Keywords routing | ✅ |
-| Phase 3: LLM-based routing | ✅ |
+**v0.5.0** - Multi-provider support
 
 ---
 

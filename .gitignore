@@ -54,3 +54,7 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Router state files
+validation_errors.log
+circuit_breaker_state.json

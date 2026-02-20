@@ -2,25 +2,69 @@
 
 ## Variables d'environnement
 
-### Fichier `.env`
+Fichier `.env`:
 
 ```bash
-# === PROVIDER CIBLE ===
-OPENROUTER_API_KEY=sk-or-v1-votre-cle
+# === PROVIDERS ===
+# Au moins un provider doit être configuré
 
-# === MODE DE ROUTING ===
-# ollama: Ollama local uniquement
-# api: OpenRouter API uniquement  
-# hybrid: Ollama + fallback API (recommandé)
-# keywords: Fallback Phase 2
+# OpenRouter (recommandé)
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+# OpenAI direct
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
+
+# Google
+GOOGLE_API_KEY=...
+GOOGLE_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+
+# Ollama (local, gratuit)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# === ROUTING ===
+# ollama | api | hybrid | keywords
 ROUTING_MODE=hybrid
-
-# === ROUTING OLLAMA ===
-OLLAMA_BASE_URL=http://192.168.1.168:11434
 OLLAMA_ROUTER_MODEL=qwen2.5:0.5b
+ROUTER_API_MODEL=openrouter/qwen/qwen3-1.7b
 
-# === ROUTING API ===
-ROUTER_API_MODEL=qwen/qwen3-1.7b
+# === DÉFAUT ===
+DEFAULT_PROVIDER=openrouter
+DEFAULT_MODEL=glm-5
+```
+
+---
+
+## Format des modèles
+
+### Syntaxe
+
+```
+provider/model-name
+```
+
+### Exemples
+
+```
+openrouter/moonshotai/kimi-k2.5    # OpenRouter avec chemin complet
+openai/gpt-4o                       # OpenAI direct
+anthropic/claude-3-opus             # Anthropic
+google/gemini-1.5-pro               # Google
+ollama/llama3.1                     # Ollama local
+```
+
+### Provider par défaut
+
+Si pas de préfixe, `DEFAULT_PROVIDER` est utilisé:
+
+```bash
+# Si DEFAULT_PROVIDER=openrouter
+glm-5  # → openrouter/glm-5
 ```
 
 ---
@@ -28,9 +72,6 @@ ROUTER_API_MODEL=qwen/qwen3-1.7b
 ## Routing LLM
 
 ### Mode Ollama (local)
-
-Avantages: Gratuit, privé, rapide  
-Inconvénients: Nécessite un serveur Ollama
 
 ```bash
 ROUTING_MODE=ollama
@@ -45,76 +86,49 @@ Modèles recommandés:
 
 ### Mode API
 
-Avantages: Simple, pas d'infrastructure  
-Inconvénients: Coût, latence réseau
-
 ```bash
 ROUTING_MODE=api
-ROUTER_API_MODEL=qwen/qwen3-1.7b
+ROUTER_API_MODEL=openrouter/qwen/qwen3-1.7b
 ```
-
-Modèles légers sur OpenRouter:
-- `qwen/qwen3-1.7b` (~$0.01/1M input)
-- `google/gemma-3-4b-it`
-- `meta-llama/llama-3.2-1b-instruct`
 
 ### Mode Hybride (recommandé)
 
-Essaie Ollama, fallback API si échec.
-
 ```bash
 ROUTING_MODE=hybrid
+# Essaie Ollama, fallback API
 ```
 
 ---
 
-## Modèles par catégorie
+## Mix de providers
 
-### Via API
-
-```bash
-curl -X POST http://localhost:3456/config/model-mapping \
-  -H "Content-Type: application/json" \
-  -d '{"category": "code", "models": ["glm-5", "kimi-k2.5", "gpt-4o-mini"]}'
-```
-
-### Via fichier
-
-Éditer `router_config.json`:
+### Exemple: tools avec fallback multi-provider
 
 ```json
 {
-  "model_mappings": {
-    "tools": ["moonshotai/kimi-k2.5", "z-ai/glm-5", "openai/gpt-4o-mini"],
-    "code": ["z-ai/glm-5", "openai/gpt-4o-mini", "moonshotai/kimi-k2.5"]
-  }
+  "tools": [
+    "openrouter/moonshotai/kimi-k2.5",
+    "openai/gpt-4o",
+    "anthropic/claude-3-sonnet"
+  ]
 }
 ```
 
-**Format:** Premier modèle = primaire, suivants = fallbacks.
+Si OpenRouter échoue → OpenAI → Anthropic.
 
----
+### Exemple: Utiliser Ollama en fallback
 
-## Catégories personnalisées
-
-### Créer une catégorie
-
-```bash
-curl -X POST http://localhost:3456/config/category \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "creative",
-    "models": ["moonshotai/kimi-k2.5"],
-    "keywords": ["story", "poem", "creative"],
-    "description": "Creative writing"
-  }'
+```json
+{
+  "conversation": [
+    "openrouter/z-ai/glm-5",
+    "openai/gpt-4o-mini",
+    "ollama/llama3.1"
+  ]
+}
 ```
 
-### Supprimer une catégorie
-
-```bash
-curl -X DELETE http://localhost:3456/config/category/creative
-```
+Si tous les providers payants échouent → Ollama local (gratuit).
 
 ---
 
@@ -129,16 +143,30 @@ L'état est persisté dans `circuit_breaker_state.json`.
 
 ---
 
-## Coûts OpenRouter
+## Fichier de configuration
 
-*Source: [openrouter.ai/models](https://openrouter.ai/models)*
+`router_config.json`:
 
-| Modèle | Input ($/1M) | Output ($/1M) | Notes |
-|--------|--------------|---------------|-------|
-| kimi-k2.5 | 0.60 | 3.00 | Multimodal, excellent pour tools |
-| glm-5 | 0.05 | 0.15 | Très économique, bon généraliste |
-| gpt-4o-mini | 0.15 | 0.60 | OpenAI, fiable |
-| qwen3-1.7b | 0.01 | 0.02 | Ultra-économique, pour routing |
+```json
+{
+  "model_mappings": {
+    "tools": ["openrouter/kimi-k2.5", "openai/gpt-4o"],
+    "code": ["openrouter/glm-5", "anthropic/claude-3-sonnet"],
+    "reasoning": ["openrouter/kimi-k2.5", "openai/gpt-4o"],
+    "conversation": ["openrouter/glm-5", "ollama/llama3.1"]
+  },
+  "keywords": {
+    "code": ["python", "function", "debug", "git"],
+    "reasoning": ["why", "how", "explain", "analyze"]
+  },
+  "custom_categories": {
+    "creative": {
+      "models": ["openrouter/kimi-k2.5"],
+      "keywords": ["story", "poem"]
+    }
+  }
+}
+```
 
 ---
 
@@ -146,6 +174,6 @@ L'état est persisté dans `circuit_breaker_state.json`.
 
 | Fichier | Contenu |
 |---------|---------|
-| Console | Requêtes, erreurs, circuit breaker |
-| `validation_errors.log` | Erreurs de validation détaillées |
-| `circuit_breaker_state.json` | État persisté du CB |
+| Console | Requêtes, erreurs, routing |
+| `validation_errors.log` | Erreurs de validation |
+| `circuit_breaker_state.json` | État persisté |

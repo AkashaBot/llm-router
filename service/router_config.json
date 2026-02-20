@@ -1,132 +1,41 @@
 {
   "model_mappings": {
     "tools": [
-      "moonshotai/kimi-k2.5",
-      "z-ai/glm-5",
+      "openrouter/moonshotai/kimi-k2.5",
+      "openrouter/z-ai/glm-5",
       "openai/gpt-4o-mini"
     ],
     "code": [
-      "z-ai/glm-5",
+      "openrouter/z-ai/glm-5",
       "openai/gpt-4o-mini",
-      "moonshotai/kimi-k2.5"
+      "openrouter/moonshotai/kimi-k2.5"
     ],
     "reasoning": [
-      "moonshotai/kimi-k2.5",
-      "z-ai/glm-5",
+      "openrouter/moonshotai/kimi-k2.5",
+      "openrouter/z-ai/glm-5",
       "openai/gpt-4o-mini"
     ],
     "conversation": [
-      "z-ai/glm-5",
+      "openrouter/z-ai/glm-5",
       "openai/gpt-4o-mini",
-      "moonshotai/kimi-k2.5"
+      "openrouter/moonshotai/kimi-k2.5"
     ],
     "creative": [
-      "moonshotai/kimi-k2.5",
-      "z-ai/glm-5"
+      "openrouter/moonshotai/kimi-k2.5",
+      "openrouter/z-ai/glm-5"
     ]
   },
   "keywords": {
-    "code": [
-      "code",
-      "python",
-      "javascript",
-      "function",
-      "class",
-      "def ",
-      "import ",
-      "bug",
-      "debug",
-      "error",
-      "refactor",
-      "api",
-      "http",
-      "json",
-      "sql",
-      "file",
-      "script",
-      "terminal",
-      "git",
-      "commit",
-      "push",
-      "pull",
-      "react",
-      "vue",
-      "node",
-      "typescript",
-      "java",
-      "c++",
-      "rust",
-      "go"
-    ],
-    "reasoning": [
-      "why",
-      "how",
-      "explain",
-      "analyze",
-      "think",
-      "reason",
-      "prove",
-      "math",
-      "calculate",
-      "solution",
-      "logic",
-      "problem",
-      "determine",
-      "compare",
-      "differentiate",
-      "evaluate",
-      "assess",
-      "complex",
-      "research",
-      "study",
-      "understand",
-      "concept",
-      "theory"
-    ],
-    "conversation": [
-      "hello",
-      "hi",
-      "hey",
-      "thanks",
-      "thank you",
-      "please",
-      "sorry",
-      "yes",
-      "no",
-      "ok",
-      "okay",
-      "sure",
-      "what",
-      "who",
-      "when",
-      "where",
-      "weather",
-      "news",
-      "info",
-      "help"
-    ],
-    "creative": [
-      "story",
-      "write",
-      "creative",
-      "poem",
-      "fiction"
-    ]
+    "code": ["code", "python", "javascript", "function", "class", "def ", "import ", "bug", "debug", "error", "refactor", "api", "git"],
+    "reasoning": ["why", "how", "explain", "analyze", "think", "reason", "prove", "math", "calculate", "logic"],
+    "conversation": ["hello", "hi", "hey", "thanks", "thank you", "please", "sorry", "yes", "no", "ok", "okay", "sure"],
+    "creative": ["story", "poem", "creative", "fiction"]
   },
   "custom_categories": {
     "creative": {
       "description": "Creative writing tasks",
-      "models": [
-        "moonshotai/kimi-k2.5",
-        "z-ai/glm-5"
-      ],
-      "keywords": [
-        "story",
-        "write",
-        "creative",
-        "poem",
-        "fiction"
-      ]
+      "models": ["openrouter/moonshotai/kimi-k2.5", "openrouter/z-ai/glm-5"],
+      "keywords": ["story", "poem", "creative", "fiction"]
     }
   }
 }
