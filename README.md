@@ -27,7 +27,12 @@ uvicorn main:app --host 0.0.0.0 --port 3456
 | `POST /v1/chat/completions` | OpenAI-compatible chat completions |
 | `POST /chat/completions` | Alias (compatibilité OpenClaw) |
 | `GET /health` | Health check |
-| `GET /metrics` | Métriques (requests, latence, distribution modèles) |
+| `GET /metrics` | Métriques (requests, latence, coût, circuit breaker) |
+| `GET /config` | Configuration actuelle |
+| `POST /config/category` | Ajouter/modifier une catégorie |
+| `POST /config/model-mapping` | Modifier les modèles d'une catégorie |
+| `DELETE /config/category/{name}` | Supprimer une catégorie personnalisée |
+| `POST /circuit-breaker/reset/{model}` | Réinitialiser le circuit breaker |
 
 ## Routing actuel
 

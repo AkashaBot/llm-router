@@ -22,9 +22,10 @@
 
 - [x] **3.1** Intégrer Ollama pour routing (qwen2.5:0.5b)
 - [x] **3.2** Implémenter le prompt de routing
-- [ ] **3.3** Ajouter métriques de coût estimé
-- [ ] **3.4** Ajouter circuit breaker
+- [x] **3.3** Ajouter métriques de coût estimé
+- [x] **3.4** Implémenter circuit breaker
 - [ ] **3.5** Tests de charge et validation
+- [x] **3.6** API pour configurer modèles et catégories personnalisées
 
 ## Notes
 
