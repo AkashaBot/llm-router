@@ -32,10 +32,13 @@ app = FastAPI(title="LLM Router", version="0.4.0")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    print(f"Validation error: {exc.errors()}")
+    try:
+        errors = str(exc.errors())
+    except:
+        errors = "Validation error (encoding issue)"
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors(), "body": str(exc.body)[:500]}
+        content={"detail": errors, "body": "request body not available"}
     )
 
 # =============================================================================
@@ -547,7 +550,11 @@ async def chat_completions(request: ChatCompletionRequest):
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
     
-    print(f"Request: model={request.model}, messages={len(request.messages)}, tools={len(request.tools) if request.tools else 0}")
+    # Log request (safe encoding)
+    try:
+        print(f"Request: model={request.model}, messages={len(request.messages)}, tools={len(request.tools) if request.tools else 0}")
+    except:
+        pass
     
     start_time = time.time()
     
