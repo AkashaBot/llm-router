@@ -26,19 +26,38 @@ load_dotenv()
 
 app = FastAPI(title="LLM Router", version="0.4.0")
 
+# Middleware to log raw requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    if request.url.path in ["/chat/completions", "/v1/chat/completions"]:
+        try:
+            body = await request.body()
+            print(f"[RAW REQUEST] Path: {request.url.path}, Body length: {len(body)}")
+        except:
+            pass
+    return await call_next(request)
+
 # =============================================================================
 # EXCEPTION HANDLER
 # =============================================================================
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    import json
+    from datetime import datetime
     try:
-        errors = str(exc.errors())
-    except:
-        errors = "Validation error (encoding issue)"
+        errors = exc.errors()
+        # Write to file to avoid console encoding issues
+        with open("validation_errors.log", "a", encoding="utf-8") as f:
+            f.write(f"\n--- {datetime.utcnow().isoformat()} ---\n")
+            json.dump(errors, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        errors_summary = json.dumps([{"loc": list(e.get("loc", [])), "type": e.get("type", "unknown")} for e in errors])
+    except Exception as e:
+        errors_summary = f"validation error: {str(e)[:100]}"
     return JSONResponse(
         status_code=422,
-        content={"detail": errors, "body": "request body not available"}
+        content={"detail": errors_summary, "body": "see validation_errors.log"}
     )
 
 # =============================================================================
@@ -249,7 +268,7 @@ def track_request(category: str, model: str, latency_ms: float, success: bool,
 
 class Message(BaseModel):
     role: str
-    content: str
+    content: Any  # Can be string or array (multimodal format)
     name: Optional[str] = None
 
 class ChatCompletionRequest(BaseModel):
