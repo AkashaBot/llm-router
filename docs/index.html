@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Router — Intelligent Model Routing</title>
+    <meta name="description" content="Multi-provider LLM routing with automatic fallback, cost tracking, and circuit breaker.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { text-align: center; margin-bottom: 60px; }
+        h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, #58a6ff 0%, #a371f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+        .tagline { font-size: 1.25rem; color: #8b949e; }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #238636;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-top: 16px;
+        }
+        section { margin-bottom: 50px; }
+        h2 {
+            font-size: 1.5rem;
+            color: #58a6ff;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+        }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .feature {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+        .feature:hover { border-color: #58a6ff; }
+        .feature h3 { color: #e0e0e0; margin-bottom: 8px; }
+        .feature p { color: #8b949e; font-size: 0.9rem; }
+        .providers { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 30px; }
+        .provider {
+            background: #21262d;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border: 1px solid #30363d;
+        }
+        code {
+            background: #161b22;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #79c0ff;
+        }
+        pre {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+        pre code { padding: 0; background: none; }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #238636;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            margin-right: 12px;
+            margin-top: 12px;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #2ea043; }
+        .btn-secondary { background: #21262d; border: 1px solid #30363d; }
+        .btn-secondary:hover { background: #30363d; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { color: #8b949e; font-weight: 500; }
+        footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid #30363d; color: #8b949e; }
+        footer a { color: #58a6ff; }
+        @media (max-width: 600px) { h1 { font-size: 2rem; } .features { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔮 LLM Router</h1>
+            <p class="tagline">Intelligent model routing for LLM applications</p>
+            <span class="badge">v0.5.0 — Multi-provider</span>
+        </header>
+
+        <section>
+            <h2>The Problem</h2>
+            <p style="color: #8b949e; margin-bottom: 20px;">
+                LLM applications need different models for different tasks. Providers have varying strengths, costs differ wildly, and failures happen. LLM Router solves this with automatic routing and fallback.
+            </p>
+            <pre><code>Your App → LLM Router → Best Model for Task
+                        ↓
+            OpenRouter / OpenAI / Anthropic / Google / Ollama</code></pre>
+        </section>
+
+        <section>
+            <h2>Features</h2>
+            <div class="features">
+                <div class="feature">
+                    <h3>🔀 Multi-provider</h3>
+                    <p>OpenRouter, OpenAI, Anthropic, Google AI, and local Ollama in one fallback chain.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 Smart Routing</h3>
+                    <p>Auto-detect task type: code, tools, reasoning, conversation.</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Circuit Breaker</h3>
+                    <p>Auto-disable failing models, auto-retry after recovery.</p>
+                </div>
+                <div class="feature">
+                    <h3>💰 Cost Tracking</h3>
+                    <p>Real-time USD cost estimation per request and total.</p>
+                </div>
+                <div class="feature">
+                    <h3>⚙️ Customizable</h3>
+                    <p>Define your own categories and model chains via API.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔌 Drop-in Compatible</h3>
+                    <p>OpenAI-compatible API. Just change the base URL.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Providers</h2>
+            <div class="providers">
+                <span class="provider">OpenRouter</span>
+                <span class="provider">OpenAI</span>
+                <span class="provider">Anthropic</span>
+                <span class="provider">Google AI</span>
+                <span class="provider">Ollama (local)</span>
+            </div>
+            <p style="color: #8b949e;">Mix providers in your fallback chain. If OpenAI fails → try Anthropic → fall back to local Ollama.</p>
+        </section>
+
+        <section>
+            <h2>Quick Start</h2>
+            <pre><code># Install & Run
+git clone https://github.com/AkashaBot/llm-router.git
+cd llm-router/service
+pip install -r requirements.txt
+export OPENROUTER_API_KEY=sk-or-v1-...
+uvicorn main:app --host 0.0.0.0 --port 3456
+
+# Use
+curl http://localhost:3456/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"router","messages":[{"role":"user","content":"Hello"}]}'</code></pre>
+        </section>
+
+        <section>
+            <h2>Routing Logic</h2>
+            <table>
+                <tr><th>Category</th><th>Detection</th><th>Default Models</th></tr>
+                <tr><td><code>tools</code></td><td>Request has tools array</td><td>kimi-k2.5 → glm-5 → gpt-4o-mini</td></tr>
+                <tr><td><code>code</code></td><td>Keywords: python, function...</td><td>glm-5 → gpt-4o-mini → kimi-k2.5</td></tr>
+                <tr><td><code>reasoning</code></td><td>Keywords: why, how, explain...</td><td>kimi-k2.5 → glm-5 → gpt-4o-mini</td></tr>
+                <tr><td><code>conversation</code></td><td>Short messages, greetings</td><td>glm-5 → gpt-4o-mini</td></tr>
+            </table>
+        </section>
+
+        <section>
+            <h2>API Endpoints</h2>
+            <table>
+                <tr><th>Endpoint</th><th>Description</th></tr>
+                <tr><td><code>POST /v1/chat/completions</code></td><td>OpenAI-compatible chat</td></tr>
+                <tr><td><code>GET /health</code></td><td>Health check</td></tr>
+                <tr><td><code>GET /metrics</code></td><td>Usage, cost, circuit breaker</td></tr>
+                <tr><td><code>GET /providers</code></td><td>Configured providers</td></tr>
+                <tr><td><code>POST /config/category</code></td><td>Add custom category</td></tr>
+                <tr><td><code>POST /circuit-breaker/reset-all</code></td><td>Reset all circuits</td></tr>
+            </table>
+        </section>
+
+        <section>
+            <h2>For OpenClaw Agents</h2>
+            <p style="color: #8b949e; margin-bottom: 16px;">
+                Configure as a custom provider in <code>~/.openclaw/openclaw.json</code>:
+            </p>
+            <pre><code>{
+  "models": {
+    "providers": {
+      "router": {
+        "baseUrl": "http://localhost:3456",
+        "api": "openai-completions",
+        "models": [{"id": "router"}]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {"primary": "router/router"}
+    }
+  }
+}</code></pre>
+            <p style="color: #8b949e; margin-top: 16px;">
+                Agents automatically get resilient routing with fallback chains.
+            </p>
+        </section>
+
+        <section style="text-align: center;">
+            <a href="https://github.com/AkashaBot/llm-router" class="btn">View on GitHub</a>
+            <a href="https://github.com/AkashaBot/llm-router/blob/master/docs/OPENCLAW-AGENTS.md" class="btn btn-secondary">OpenClaw Guide</a>
+        </section>
+
+        <footer>
+            <p>MIT License · <a href="https://github.com/AkashaBot/llm-router">GitHub</a> · Made for AI agents</p>
+        </footer>
+    </div>
+</body>
+</html>
