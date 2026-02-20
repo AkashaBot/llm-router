@@ -4,76 +4,109 @@
 
 Le moteur de décision qui détermine quel modèle LLM utiliser pour chaque requête.
 
-## Phase 2: Routing par Keywords (implémenté)
+## Phase 3: Routing LLM-based (implémenté)
 
-### Détection par catégorie
+### Modes disponibles
 
-```python
-CODE_KEYWORDS = ["python", "function", "code", "debug", "api", "git", "refactor", ...]
-REASONING_KEYWORDS = ["why", "how", "explain", "analyze", "think", "prove", ...]
-CONVERSATION_KEYWORDS = ["hello", "thanks", "yes", "no", "ok", "sure", ...]
+| Mode | Description | Utilisation |
+|------|-------------|-------------|
+| `ollama` | Routing via Ollama local | Priorité performances |
+| `api` | Routing via API OpenRouter | Fallback réseau |
+| `hybrid` | Ollama + fallback API | **Recommandé** |
+| `keywords` | Phase 2 uniquement | Fallback ultime |
 
-def detect_category(message: str) -> str:
-    message_lower = message.lower()
-    for keyword in CODE_KEYWORDS:
-        if keyword in message_lower:
-            return "code"
-    for keyword in REASONING_KEYWORDS:
-        if keyword in message_lower:
-            return "reasoning"
-    if len(message.split()) < 5:
-        return "conversation"
-    return "conversation"
+### Flux de routing
+
+```
+Requête entrante
+       │
+       ├── has_tools? → catégorie "tools" (direct)
+       │
+       ├── is_continuation? → garde modèle précédent
+       │
+       ├── ROUTING_MODE in ["ollama", "hybrid"]
+       │         │
+       │         ├── Ollama disponible? → route_with_ollama()
+       │         │         │
+       │         │         └── Catégorie détectée
+       │         │
+       │         └── ROUTING_MODE == "hybrid"?
+       │                   │
+       │                   └── API fallback → route_with_api()
+       │
+       └── Fallback: keywords (Phase 2)
 ```
 
-### Détection tools
+### Prompt de routing
+
+```
+Tu es un routeur de modèles LLM. Analyse la requête et choisis la meilleure catégorie.
+
+Catégories disponibles: tools, code, reasoning, conversation, creative, ...
+
+Règles:
+- tools: si la requête nécessite des appels de fonction/outils
+- code: pour écrire, corriger, expliquer du code
+- reasoning: pour analyser, raisonner, expliquer un concept complexe
+- conversation: pour les discussions simples, questions rapides
+- custom: autres catégories définies par l'utilisateur
+
+Requête: {message}
+
+Catégorie:
+```
+
+### Configuration Ollama
 
 ```python
-if request.tools is not None and len(request.tools) > 0:
-    category = "tools"
-    models = MODEL_MAPPINGS["tools"]
+OLLAMA_BASE_URL = "http://192.168.1.168:11434"
+OLLAMA_ROUTER_MODEL = "qwen2.5:0.5b"
+```
+
+Le modèle qwen2.5:0.5b (398MB) offre un bon compromis:
+- Latence: ~5-15s (premier appel avec load)
+- Précision: ~90% sur les cas standards
+- Coût: 0 (local)
+
+### Fallback keywords (Phase 2)
+
+Si Ollama/API indisponible, détection par keywords:
+
+```python
+KEYWORDS = {
+    "code": ["python", "function", "debug", "api", ...],
+    "reasoning": ["why", "how", "explain", "analyze", ...],
+    "conversation": ["hello", "thanks", "yes", "no", ...],
+    # + catégories personnalisées
+}
 ```
 
 ### Continuité de session
 
 Pour éviter de re-router à chaque message:
-- Messages courts (< 5 mots) → garder le même modèle
-- Stockage de la décision précédente par `session_id`
 
 ```python
-# Session state: {session_id: {"last_model": "...", "last_category": "..."}}
-if is_short_message(message) and session_state.get("last_model"):
-    return session_state["last_model"]
+SHORT_CONTINUATION = [
+    r"^ok$", r"^okay$", r"^yes$", r"^no$",
+    r"^thanks?$", r"^please$", r"^sure$",
+    r"^[a-zA-Z]{1,3}$"  # Messages très courts
+]
+
+# Si message court → garde le modèle précédent
 ```
 
-## Phase 3: Router LLM-based (à venir)
+## Catégories personnalisées
 
-Utilisation d'un petit modèle (Qwen-0.5B) pour le routing intelligent.
+Ajout via API:
 
-### Prompt de routing (draft)
-
-```
-Tu es un router de modèles LLM. Analyse cette requête et décide quel modèle utiliser.
-
-Contexte récent (3 derniers échanges):
-{context}
-
-Requête actuelle: {user_message}
-
-Types disponibles:
-- code: Pour le code, debug, refactoring, fichiers techniques
-- reasoning: Pour l'analyse, la réflexion, les problèmes complexes
-- conversation: Pour les questions simples, le small talk, les réponses rapides
-- tools: Pour les requêtes avec function calling
-
-Réponds uniquement avec un mot: code, reasoning, conversation, ou tools
+```bash
+POST /config/category
+{
+  "name": "creative",
+  "models": ["aurora-alpha", "glm-5"],
+  "keywords": ["story", "poem", "creative"],
+  "description": "Creative writing tasks"
+}
 ```
 
-## Avantages Phase 2 vs Phase 3
-
-| Aspect | Phase 2 (Keywords) | Phase 3 (LLM) |
-|--------|-------------------|---------------|
-| Latence | ~0ms | ~100-500ms |
-| Précision | Bonne pour cas simples | Meilleure pour cas ambigus |
-| Maintenance | Keywords à maintenir | Prompt à ajuster |
-| Coût | 0 | Légèrement plus élevé |
+Le routing LLM prend automatiquement en compte les nouvelles catégories.

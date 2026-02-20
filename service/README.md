@@ -4,11 +4,12 @@ Service FastAPI de routage intelligent pour les requêtes LLM.
 
 ## Fonctionnalités
 
-- **Routing automatique** par détection de catégorie (code/reasoning/conversation/tools)
-- **Support function calling** - détection des requêtes avec tools et routing spécialisé
-- **Fallback chain** - basculement automatique vers modèles alternatifs si échec
-- **Monitoring** - endpoint `/metrics` avec latence, distribution modèles, succès/échec
-- **OpenAI-compatible** - endpoint `/v1/chat/completions` compatible OpenAI
+- **Routing intelligent** via Ollama (qwen2.5:0.5b) ou API
+- **Circuit breaker** - désactive automatiquement les modèles défaillants
+- **Métriques de coût** - estimation USD par requête
+- **Catégories personnalisables** - ajoutez vos propres cas d'usage
+- **Support function calling** - détection automatique des tools
+- **OpenAI-compatible** - endpoint `/v1/chat/completions`
 
 ## Installation
 
@@ -40,7 +41,11 @@ uvicorn main:app --host 0.0.0.0 --port 3456
 | POST | `/chat/completions` | Alias pour compatibilité OpenClaw |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Métriques d'utilisation |
-| GET | `/models` | Liste des modèles disponibles |
+| GET | `/config` | Configuration actuelle |
+| POST | `/config/category` | Ajouter/modifier une catégorie |
+| POST | `/config/model-mapping` | Modifier les modèles d'une catégorie |
+| DELETE | `/config/category/{name}` | Supprimer une catégorie personnalisée |
+| POST | `/circuit-breaker/reset/{model}` | Réinitialiser le circuit breaker |
 
 ## Routing
 
@@ -55,11 +60,26 @@ uvicorn main:app --host 0.0.0.0 --port 3456
 
 Variables d'environnement (`.env`):
 
-```
+```bash
+# OpenRouter API
 OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-PHASE2_ENABLED=true
+
+# Routing mode: "ollama" | "api" | "hybrid" | "keywords"
+ROUTING_MODE=hybrid
+
+# Ollama config
+OLLAMA_BASE_URL=http://192.168.1.168:11434
+OLLAMA_ROUTER_MODEL=qwen2.5:0.5b
+
+# API routing fallback
+ROUTER_API_MODEL=qwen/qwen3-1.7b
 ```
+
+## Circuit Breaker
+
+- **Seuil**: 3 erreurs consécutives
+- **Recovery**: 5 minutes
+- **Reset manuel**: `POST /circuit-breaker/reset/{model}`
 
 ## Exemple d'utilisation
 
@@ -78,10 +98,18 @@ curl -X POST http://localhost:3456/v1/chat/completions \
     "tools":[{"type":"function","function":{"name":"get_weather"}}]
   }'
 
+# Ajouter une catégorie
+curl -X POST http://localhost:3456/config/category \
+  -H "Content-Type: application/json" \
+  -d '{"name":"creative","models":["aurora-alpha"],"keywords":["story","poem"]}'
+
 # Métriques
 curl http://localhost:3456/metrics
 ```
 
-## Intégration OpenClaw
+## Fichiers
 
-Voir `../README.md` pour la configuration complète.
+- `main.py` - Service FastAPI principal
+- `requirements.txt` - Dépendances Python
+- `.env.example` - Template de configuration
+- `router_config.json` - Configuration sauvegardée (généré automatiquement)

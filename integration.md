@@ -23,9 +23,7 @@
             "input": ["text"],
             "cost": {
               "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0
+              "output": 0
             },
             "contextWindow": 200000,
             "maxTokens": 8192
@@ -40,8 +38,7 @@
         "primary": "router/router",
         "fallbacks": [
           "openrouter/openrouter/aurora-alpha",
-          "openrouter/z-ai/glm-5",
-          "nvidia-nim/moonshotai/kimi-k2.5"
+          "openrouter/z-ai/glm-5"
         ]
       }
     }
@@ -57,7 +54,8 @@ OpenClaw Gateway
        ▼
    router/router (localhost:3456)
        │
-       ├── Détection catégorie (keywords)
+       ├── Routing LLM (Ollama/API)
+       │   └── Détection catégorie
        │
        ▼
    OpenRouter API
@@ -91,15 +89,42 @@ openclaw gateway restart
 | `GET /health` | Health check |
 | `GET /metrics` | Monitoring |
 
+## Cron jobs
+
+Pour utiliser le router dans les cron jobs, définir:
+```json
+{
+  "payload": {
+    "kind": "agentTurn",
+    "message": "...",
+    "model": "router/router"
+  }
+}
+```
+
+Le router détectera automatiquement les tools et choisira le modèle approprié.
+
 ## Avantages de cette approche
 
 - **Pas de modification du core OpenClaw** - juste de la config
 - **Transparent** - les agents utilisent `router/router` comme n'importe quel modèle
 - **Flexible** - on peut changer les mappings sans toucher à OpenClaw
 - **Observable** - endpoint `/metrics` pour le monitoring
+- **Résilient** - circuit breaker intégré
+
+## Configuration par défaut
+
+Le router applique ces règles:
+
+| Requête | Modèle sélectionné |
+|---------|-------------------|
+| Avec `tools` | aurora-alpha → kimi-k2.5 → glm-5 |
+| Keywords code | glm-5 → aurora-alpha → gpt-4o-mini |
+| Keywords reasoning | aurora-alpha → glm-5 → kimi-k2.5 |
+| Messages courts | glm-5 → gpt-4o-mini → aurora-alpha |
 
 ## Limitations actuelles
 
-- Circuit breaker non implémenté
-- Pas de métriques de coût
-- Router basique (keywords) - Phase 3 (LLM) à venir
+- Provider unique (OpenRouter)
+- Pas de cache de requêtes
+- Pas d'alerting intégré
