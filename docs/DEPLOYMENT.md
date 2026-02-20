@@ -1,17 +1,39 @@
 # Déploiement
 
-## Démarrage
+## Scripts fournis
+
+| Script | OS | Usage |
+|--------|-----|-------|
+| `scripts/start.sh` | Linux/macOS | Démarrage manuel |
+| `scripts/start.bat` | Windows | Démarrage manuel |
+| `scripts/health-check.sh` | Linux/macOS | Vérification + restart auto |
+| `scripts/health-check.ps1` | Windows | Vérification + restart auto |
+
+---
+
+## Démarrage manuel
 
 ```bash
+# Linux/macOS
+./scripts/start.sh
+
+# Windows
+scripts\start.bat
+
+# Ou directement
 cd service
 uvicorn main:app --host 0.0.0.0 --port 3456
 ```
 
-## Auto-start
+---
 
-### Linux/macOS (systemd)
+## Auto-start au boot
 
-Créer `/etc/systemd/system/llm-router.service`:
+### Linux (systemd)
+
+```bash
+sudo nano /etc/systemd/system/llm-router.service
+```
 
 ```ini
 [Unit]
@@ -22,8 +44,10 @@ After=network.target
 Type=simple
 User=your-user
 WorkingDirectory=/path/to/llm-router/service
-ExecStart=/path/to/venv/bin/uvicorn main:app --host 0.0.0.0 --port 3456
+Environment="ROUTER_DIR=/path/to/llm-router/service"
+ExecStart=/usr/bin/uvicorn main:app --host 0.0.0.0 --port 3456
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -38,19 +62,37 @@ sudo systemctl start llm-router
 
 ```bash
 crontab -e
-# Ajouter:
-@reboot cd /path/to/llm-router/service && uvicorn main:app --host 0.0.0.0 --port 3456
 ```
 
-### Windows (Task Scheduler)
+```cron
+# Start at boot
+@reboot /path/to/llm-router/scripts/start.sh
 
-1. Ouvrir "Task Scheduler"
-2. Créer tâche "LLM Router"
-3. Déclencheur: "At startup"
-4. Action: `python -m uvicorn main:app --host 0.0.0.0 --port 3456`
-5. Répertoire: `C:\path\to\llm-router\service`
+# Health check every 5 minutes
+*/5 * * * * /path/to/llm-router/scripts/health-check.sh
+```
 
-### Docker
+### Windows (Task Scheduler - boot)
+
+1. Ouvrir "Task Scheduler" (taskschd.msc)
+2. Create Task → "LLM Router"
+3. **Trigger:** "At startup"
+4. **Action:** Start a program
+   - Program: `powershell`
+   - Arguments: `-ExecutionPolicy Bypass -File C:\path\to\llm-router\scripts\start.bat`
+5. **Settings:** "Run whether user is logged on or not"
+
+### Windows (Task Scheduler - health check)
+
+1. Create Task → "LLM Router Health Check"
+2. **Trigger:** "On a schedule" → "Repeat every 5 minutes"
+3. **Action:** Start a program
+   - Program: `powershell`
+   - Arguments: `-ExecutionPolicy Bypass -File C:\path\to\llm-router\scripts\health-check.ps1`
+
+---
+
+## Docker
 
 ```dockerfile
 FROM python:3.10-slim
@@ -59,12 +101,18 @@ COPY service/requirements.txt .
 RUN pip install -r requirements.txt
 COPY service/ .
 EXPOSE 3456
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:3456/health || exit 1
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3456"]
 ```
 
 ```bash
 docker build -t llm-router .
-docker run -p 3456:3456 --env-file .env llm-router
+docker run -d \
+  --name llm-router \
+  --restart always \
+  -p 3456:3456 \
+  --env-file .env \
+  llm-router
 ```
 
 ---
@@ -76,8 +124,6 @@ docker run -p 3456:3456 --env-file .env llm-router
 ```bash
 ROUTING_MODE=hybrid
 OPENROUTER_API_KEY=sk-or-v1-...
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Ports
@@ -92,9 +138,6 @@ ANTHROPIC_API_KEY=sk-ant-...
 ```bash
 # Linux (ufw)
 sudo ufw allow 3456/tcp
-
-# Linux (iptables)
-sudo iptables -A INPUT -p tcp --dport 3456 -j ACCEPT
 
 # Windows
 netsh advfirewall firewall add rule name="LLM Router" dir=in action=allow protocol=tcp localport=3456
@@ -125,11 +168,14 @@ netstat -an | findstr 3456
 taskkill /PID <PID> /F
 ```
 
-### Provider non configuré
+### Router ne répond pas
 
 ```bash
-# Vérifier la configuration
-curl http://localhost:3456/providers
+# Linux/macOS
+./scripts/health-check.sh
+
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\health-check.ps1
 ```
 
 ### Circuit breaker ouvert
@@ -140,8 +186,7 @@ curl -X POST http://localhost:3456/circuit-breaker/reset-all
 
 ### Logs
 
-Surveiller la sortie console ou rediriger:
-
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 3456 >> router.log 2>&1
+# Les scripts écrivent dans service/health.log
+tail -f service/health.log
 ```

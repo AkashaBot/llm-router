@@ -16,9 +16,9 @@
       "openai/gpt-4o-mini"
     ],
     "conversation": [
+      "openrouter/qwen/qwen3-1.7b",
       "openrouter/z-ai/glm-5",
-      "openai/gpt-4o-mini",
-      "openrouter/moonshotai/kimi-k2.5"
+      "ollama/qwen2.5"
     ],
     "creative": [
       "openrouter/moonshotai/kimi-k2.5",
@@ -26,16 +26,67 @@
     ]
   },
   "keywords": {
-    "code": ["code", "python", "javascript", "function", "class", "def ", "import ", "bug", "debug", "error", "refactor", "api", "git"],
-    "reasoning": ["why", "how", "explain", "analyze", "think", "reason", "prove", "math", "calculate", "logic"],
-    "conversation": ["hello", "hi", "hey", "thanks", "thank you", "please", "sorry", "yes", "no", "ok", "okay", "sure"],
-    "creative": ["story", "poem", "creative", "fiction"]
+    "code": [
+      "code",
+      "python",
+      "javascript",
+      "function",
+      "class",
+      "def ",
+      "import ",
+      "bug",
+      "debug",
+      "error",
+      "refactor",
+      "api",
+      "git"
+    ],
+    "reasoning": [
+      "why",
+      "how",
+      "explain",
+      "analyze",
+      "think",
+      "reason",
+      "prove",
+      "math",
+      "calculate",
+      "logic"
+    ],
+    "conversation": [
+      "hello",
+      "hi",
+      "hey",
+      "thanks",
+      "thank you",
+      "please",
+      "sorry",
+      "yes",
+      "no",
+      "ok",
+      "okay",
+      "sure"
+    ],
+    "creative": [
+      "story",
+      "poem",
+      "creative",
+      "fiction"
+    ]
   },
   "custom_categories": {
     "creative": {
       "description": "Creative writing tasks",
-      "models": ["openrouter/moonshotai/kimi-k2.5", "openrouter/z-ai/glm-5"],
-      "keywords": ["story", "poem", "creative", "fiction"]
+      "models": [
+        "openrouter/moonshotai/kimi-k2.5",
+        "openrouter/z-ai/glm-5"
+      ],
+      "keywords": [
+        "story",
+        "poem",
+        "creative",
+        "fiction"
+      ]
     }
   }
 }
