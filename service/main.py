@@ -612,6 +612,18 @@ async def delete_category(category_name: str):
     save_config()
     return {"status": "ok", "deleted": category_name}
 
+@app.post("/config/reload")
+async def reload_config():
+    """Reload configuration from file without restart"""
+    if load_config():
+        return {
+            "status": "ok",
+            "message": "Config reloaded",
+            "categories": list(model_mappings.keys()),
+            "model_mappings": model_mappings
+        }
+    raise HTTPException(500, "Failed to reload config")
+
 @app.post("/circuit-breaker/reset/{model}")
 async def reset_circuit(model: str):
     circuit_breaker.record_success(model)
