@@ -49,14 +49,14 @@ if (Test-Path $CronJobsPath) {
     $jobs = @{ jobs = @() }
 }
 
-# Check if job already exists
+# Check if job already exists (every 1 minute for stability)
 $existingJob = $jobs.jobs | Where-Object { $_.id -eq "llm-router-health-check" }
 
 if (-not $existingJob) {
     $newJob = @{
         id = "llm-router-health-check"
         enabled = $true
-        schedule = "*/5 * * * *"
+        schedule = "*/1 * * * *"  # Every 1 minute for quick recovery
         timezone = "Europe/Paris"
         payload = @{
             kind = "shell"

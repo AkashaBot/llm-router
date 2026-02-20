@@ -27,9 +27,9 @@ echo "🔧 Installing OpenClaw skill..."
 mkdir -p "$OPENCLAW_DIR/skills/llm-router"
 cp "$ROUTER_DIR/skill/"* "$OPENCLAW_DIR/skills/llm-router/" 2>/dev/null || cp "$ROUTER_DIR/../skills/llm-router/"* "$OPENCLAW_DIR/skills/llm-router/" 2>/dev/null || true
 
-# 4. Add cron job for health check
+# 4. Add cron job for health check (every 1 minute for stability)
 echo "⏰ Adding health-check cron job..."
-CRON_JOB="*/5 * * * * $ROUTER_DIR/scripts/health-check.sh"
+CRON_JOB="*/1 * * * * $ROUTER_DIR/scripts/health-check.sh"
 
 # Check if cron job already exists
 if ! crontab -l 2>/dev/null | grep -q "llm-router.*health-check"; then
