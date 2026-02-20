@@ -1,30 +1,19 @@
-# LLM Router Service
-
-Service FastAPI de routage intelligent pour les requêtes LLM.
-
-## Fonctionnalités
-
-- **Routing intelligent** via Ollama (qwen2.5:0.5b) ou API
-- **Circuit breaker** - désactive automatiquement les modèles défaillants
-- **Métriques de coût** - estimation USD par requête
-- **Catégories personnalisables** - ajoutez vos propres cas d'usage
-- **Support function calling** - détection automatique des tools
-- **OpenAI-compatible** - endpoint `/v1/chat/completions`
+# Guide d'utilisation
 
 ## Installation
 
 ```bash
-# Créer l'environnement virtuel
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-
-# Installer les dépendances
+cd service
 pip install -r requirements.txt
-
-# Configurer
 cp .env.example .env
-# Éditer .env avec votre OPENROUTER_API_KEY
+```
+
+## Configuration minimale
+
+Éditer `.env`:
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-votre-cle
 ```
 
 ## Démarrage
@@ -33,83 +22,159 @@ cp .env.example .env
 uvicorn main:app --host 0.0.0.0 --port 3456
 ```
 
-## Endpoints
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/v1/chat/completions` | Chat completions (OpenAI-compatible) |
-| POST | `/chat/completions` | Alias pour compatibilité OpenClaw |
-| GET | `/health` | Health check |
-| GET | `/metrics` | Métriques d'utilisation |
-| GET | `/config` | Configuration actuelle |
-| POST | `/config/category` | Ajouter/modifier une catégorie |
-| POST | `/config/model-mapping` | Modifier les modèles d'une catégorie |
-| DELETE | `/config/category/{name}` | Supprimer une catégorie personnalisée |
-| POST | `/circuit-breaker/reset/{model}` | Réinitialiser le circuit breaker |
-
-## Routing
-
-| Catégorie | Détection | Modèles |
-|-----------|-----------|---------|
-| tools | `request.tools` présent | aurora-alpha → kimi-k2.5 → glm-5 |
-| code | keywords: python, function... | glm-5 → aurora-alpha → gpt-4o-mini |
-| reasoning | keywords: why, how, explain... | aurora-alpha → glm-5 → kimi-k2.5 |
-| conversation | messages courts | glm-5 → gpt-4o-mini → aurora-alpha |
-
-## Configuration
-
-Variables d'environnement (`.env`):
+## Vérification
 
 ```bash
-# OpenRouter API
-OPENROUTER_API_KEY=sk-or-v1-...
-
-# Routing mode: "ollama" | "api" | "hybrid" | "keywords"
-ROUTING_MODE=hybrid
-
-# Ollama config
-OLLAMA_BASE_URL=http://192.168.1.168:11434
-OLLAMA_ROUTER_MODEL=qwen2.5:0.5b
-
-# API routing fallback
-ROUTER_API_MODEL=qwen/qwen3-1.7b
+curl http://localhost:3456/health
 ```
+
+---
+
+## Modèles utilisés
+
+| Catégorie | Modèles (fallback chain) |
+|-----------|--------------------------|
+| **tools** | kimi-k2.5 → glm-5 → gpt-4o-mini |
+| **code** | glm-5 → gpt-4o-mini → kimi-k2.5 |
+| **reasoning** | kimi-k2.5 → glm-5 → gpt-4o-mini |
+| **conversation** | glm-5 → gpt-4o-mini → kimi-k2.5 |
+
+### Coûts estimés (OpenRouter)
+
+| Modèle | Input | Output |
+|--------|-------|--------|
+| kimi-k2.5 | $0.60/1M | $3.00/1M |
+| glm-5 | $0.05/1M | $0.15/1M |
+| gpt-4o-mini | $0.15/1M | $0.60/1M |
+
+*Source: [OpenRouter](https://openrouter.ai/models)*
+
+---
+
+## Endpoints principaux
+
+```bash
+# Requête chat
+POST /v1/chat/completions
+POST /chat/completions  # Alias OpenClaw
+
+# Monitoring
+GET /health
+GET /metrics
+
+# Configuration
+GET /config
+POST /config/category
+POST /config/model-mapping
+DELETE /config/category/{name}
+
+# Circuit breaker
+POST /circuit-breaker/reset/{model}
+POST /circuit-breaker/reset-all
+```
+
+---
+
+## Modifier les modèles
+
+### Changer les modèles d'une catégorie
+
+```bash
+curl -X POST http://localhost:3456/config/model-mapping \
+  -H "Content-Type: application/json" \
+  -d '{"category": "code", "models": ["glm-5", "kimi-k2.5"]}'
+```
+
+### Créer une nouvelle catégorie
+
+```bash
+curl -X POST http://localhost:3456/config/category \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "creative",
+    "models": ["kimi-k2.5", "glm-5"],
+    "keywords": ["story", "poem", "creative"]
+  }'
+```
+
+---
+
+## Métriques
+
+```bash
+curl http://localhost:3456/metrics | jq
+```
+
+Sortie:
+```json
+{
+  "requests": {"total": 100, "success": 98, "failed": 2},
+  "avg_latency_ms": 1234,
+  "total_cost_usd": 0.45,
+  "circuit_breaker": {"open_circuits": {}}
+}
+```
+
+---
 
 ## Circuit Breaker
 
-- **Seuil**: 3 erreurs consécutives
-- **Recovery**: 5 minutes
-- **Reset manuel**: `POST /circuit-breaker/reset/{model}`
-
-## Exemple d'utilisation
+Le circuit breaker désactive automatiquement un modèle après 3 erreurs consécutives.
 
 ```bash
-# Test simple
-curl -X POST http://localhost:3456/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"router","messages":[{"role":"user","content":"Hello!"}]}'
+# Voir l'état
+curl http://localhost:3456/metrics | jq .circuit_breaker
 
-# Test avec tools
-curl -X POST http://localhost:3456/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model":"router",
-    "messages":[{"role":"user","content":"What is the weather?"}],
-    "tools":[{"type":"function","function":{"name":"get_weather"}}]
-  }'
+# Reset un modèle
+curl -X POST http://localhost:3456/circuit-breaker/reset/kimi-k2.5
 
-# Ajouter une catégorie
-curl -X POST http://localhost:3456/config/category \
-  -H "Content-Type: application/json" \
-  -d '{"name":"creative","models":["aurora-alpha"],"keywords":["story","poem"]}'
-
-# Métriques
-curl http://localhost:3456/metrics
+# Reset tous
+curl -X POST http://localhost:3456/circuit-breaker/reset-all
 ```
+
+---
+
+## Intégration OpenClaw
+
+Dans `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "models": {
+    "providers": {
+      "router": {
+        "baseUrl": "http://localhost:3456",
+        "api": "openai-completions",
+        "models": [{"id": "router"}]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {"primary": "router/router"}
+    }
+  }
+}
+```
+
+---
 
 ## Fichiers
 
-- `main.py` - Service FastAPI principal
-- `requirements.txt` - Dépendances Python
-- `.env.example` - Template de configuration
-- `router_config.json` - Configuration sauvegardée (généré automatiquement)
+| Fichier | Description |
+|---------|-------------|
+| `.env` | Configuration (API keys, routing mode) |
+| `router_config.json` | Modèles et catégories sauvegardés |
+| `circuit_breaker_state.json` | État du circuit breaker |
+| `validation_errors.log` | Erreurs de validation détaillées |
+
+---
+
+## Dépannage
+
+| Problème | Solution |
+|----------|----------|
+| Port 3456 occupé | `netstat -an \| findstr 3456` puis kill |
+| 422 Validation error | Voir `validation_errors.log` |
+| Circuit breaker ouvert | Reset via API |
+| Ollama non accessible | Vérifier `OLLAMA_BASE_URL` ou utiliser `ROUTING_MODE=api` |

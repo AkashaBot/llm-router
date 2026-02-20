@@ -1,35 +1,16 @@
-# LLM Router - Étapes de développement
+# Historique de développement
 
-## Phase 1: Setup minimal (forward only)
+## Phases
 
-- [x] **1.1** Créer le projet de service API (nom: `llm-router-service`)
-- [x] **1.2** Implémenter endpoint `/v1/chat/completions` (interface OpenAI)
-- [x] **1.3** Ajouter config pour provider cible (OpenRouter par défaut)
-- [x] **1.4** Forward des requêtes vers OpenRouter sans modification
-- [x] **1.5** Tester localement avec curl/OpenClaw
-- [x] **1.6** Documenter la config OpenClaw pour utiliser le router
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Forward-only vers OpenRouter | ✅ Complète |
+| Phase 2 | Routing par keywords + monitoring | ✅ Complète |
+| Phase 3 | Routing LLM-based (Ollama/API) | ✅ Complète |
 
-## Phase 2: Routing de base (keywords/rules)
+## Commits clés
 
-- [x] **2.1** Ajouter logique de détection (code vs conversation vs reasoning)
-- [x] **2.2** Implémenter détection de continuité (messages courts = même model)
-- [x] **2.3** Configurer mappings modèles par catégorie
-- [x] **2.4** Ajouter gestion des fallbacks (si provider down → suivant)
-- [x] **2.5** Tests et validation
-- [x] **2.6** Ajouter monitoring basique (latence, modèle utilisé, succès/échec)
-
-## Phase 3: Router LLM
-
-- [x] **3.1** Intégrer Ollama pour routing (qwen2.5:0.5b)
-- [x] **3.2** Implémenter le prompt de routing
-- [x] **3.3** Ajouter métriques de coût estimé
-- [x] **3.4** Implémenter circuit breaker
-- [ ] **3.5** Tests de charge et validation
-- [x] **3.6** API pour configurer modèles et catégories personnalisées
-
-## Notes
-
-- Tech stack: À choisir (Python FastAPI ou Node.js Express)
-- Hébergement: Local
-- Provider cible phase 1: OpenRouter
-- Stockage clés API: Variables d'environnement sécurisées
+- `v0.1.0` - Phase 1: Forward-only
+- `v0.2.0` - Phase 2: Keywords routing + monitoring
+- `v0.3.0` - Phase 3: Ollama/API routing
+- `v0.4.0` - Circuit breaker persistence, custom categories
