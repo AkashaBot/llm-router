@@ -14,6 +14,8 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import httpx
 from dotenv import load_dotenv
@@ -24,6 +26,14 @@ import asyncio
 load_dotenv()
 
 app = FastAPI(title="LLM Router", version="0.3.0")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print(f"Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body}
+    )
 
 # =============================================================================
 # CONFIGURATION
@@ -130,6 +140,9 @@ class ChatCompletionRequest(BaseModel):
     user: Optional[str] = None
     tools: Optional[List[Dict[str, Any]]] = None
     tool_choice: Optional[Any] = None
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields from OpenClaw
 
 # =============================================================================
 # ROUTING LOGIC
@@ -338,6 +351,8 @@ async def get_config():
 async def chat_completions(request: ChatCompletionRequest):
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
+    
+    print(f"Received request: model={request.model}, messages={len(request.messages)}, tools={len(request.tools) if request.tools else 0}")
     
     start_time = time.time()
     
