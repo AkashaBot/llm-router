@@ -111,6 +111,7 @@ MODEL_COSTS = {
     "openrouter/moonshotai/kimi-k2.5": {"input": 0.60, "output": 3.00},
     "openrouter/z-ai/glm-5": {"input": 0.05, "output": 0.15},
     "openrouter/qwen/qwen3-1.7b": {"input": 0.01, "output": 0.02},
+    "openrouter/qwen/qwen3-1.7b:free": {"input": 0, "output": 0},
     # OpenAI models
     "openai/gpt-4o": {"input": 2.50, "output": 10.00},
     "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
