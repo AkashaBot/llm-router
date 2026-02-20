@@ -490,6 +490,11 @@ async def call_model(model_id: str, request: ChatCompletionRequest) -> Tuple[Dic
     if prov_config.get("api_key") and prov_config.get("auth_header"):
         headers[prov_config["auth_header"]] = prov_config["auth_prefix"] + prov_config["api_key"]
     
+    # Add attribution headers for OpenRouter
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = ROUTER_URL
+        headers["X-Title"] = ROUTER_NAME
+    
     # Handle Anthropic's required version header
     if prov_config.get("requires_version"):
         headers["anthropic-version"] = "2023-06-01"
