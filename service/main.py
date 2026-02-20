@@ -61,7 +61,6 @@ ROUTER_API_MODEL = os.getenv("ROUTER_API_MODEL", "qwen/qwen3-1.7b")
 # =============================================================================
 
 MODEL_COSTS = {
-    "openrouter/aurora-alpha": {"input": 0.15, "output": 0.60},
     "moonshotai/kimi-k2.5": {"input": 0.10, "output": 0.30},
     "z-ai/glm-5": {"input": 0.05, "output": 0.15},
     "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -76,10 +75,10 @@ MODEL_COSTS = {
 CONFIG_FILE = os.getenv("ROUTER_CONFIG_FILE", "router_config.json")
 
 DEFAULT_MODEL_MAPPINGS = {
-    "tools": ["openrouter/aurora-alpha", "moonshotai/kimi-k2.5", "z-ai/glm-5"],
-    "code": ["z-ai/glm-5", "openrouter/aurora-alpha", "openai/gpt-4o-mini"],
-    "reasoning": ["openrouter/aurora-alpha", "z-ai/glm-5", "moonshotai/kimi-k2.5"],
-    "conversation": ["z-ai/glm-5", "openai/gpt-4o-mini", "openrouter/aurora-alpha"]
+    "tools": ["moonshotai/kimi-k2.5", "z-ai/glm-5", "openai/gpt-4o-mini"],
+    "code": ["z-ai/glm-5", "openai/gpt-4o-mini", "moonshotai/kimi-k2.5"],
+    "reasoning": ["moonshotai/kimi-k2.5", "z-ai/glm-5", "openai/gpt-4o-mini"],
+    "conversation": ["z-ai/glm-5", "openai/gpt-4o-mini", "moonshotai/kimi-k2.5"]
 }
 
 DEFAULT_KEYWORDS = {

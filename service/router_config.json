@@ -1,27 +1,27 @@
 {
   "model_mappings": {
     "tools": [
-      "openrouter/aurora-alpha",
       "moonshotai/kimi-k2.5",
-      "z-ai/glm-5"
+      "z-ai/glm-5",
+      "openai/gpt-4o-mini"
     ],
     "code": [
       "z-ai/glm-5",
-      "openrouter/aurora-alpha",
-      "openai/gpt-4o-mini"
+      "openai/gpt-4o-mini",
+      "moonshotai/kimi-k2.5"
     ],
     "reasoning": [
-      "openrouter/aurora-alpha",
+      "moonshotai/kimi-k2.5",
       "z-ai/glm-5",
-      "moonshotai/kimi-k2.5"
+      "openai/gpt-4o-mini"
     ],
     "conversation": [
       "z-ai/glm-5",
       "openai/gpt-4o-mini",
-      "openrouter/aurora-alpha"
+      "moonshotai/kimi-k2.5"
     ],
     "creative": [
-      "openrouter/aurora-alpha",
+      "moonshotai/kimi-k2.5",
       "z-ai/glm-5"
     ]
   },
@@ -117,7 +117,7 @@
     "creative": {
       "description": "Creative writing tasks",
       "models": [
-        "openrouter/aurora-alpha",
+        "moonshotai/kimi-k2.5",
         "z-ai/glm-5"
       ],
       "keywords": [
