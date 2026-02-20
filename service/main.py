@@ -1,12 +1,17 @@
+# LLM Router Service - Phase 3: Routing LLM-based avec fallback
 """
-LLM Router Service - Phase 2: Routing intelligent avec détection de catégorie
+Routing intelligent avec 3 modes:
+- ollama: Utilise un modèle local via Ollama
+- api: Utilise une API légère (OpenRouter)
+- hybrid: Ollama avec fallback API
+- keywords: Mode Phase 2 (fallback ultime)
 """
 import os
 import re
 import time
 import json
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -14,30 +19,32 @@ import httpx
 from dotenv import load_dotenv
 from collections import defaultdict
 import threading
+import asyncio
 
 load_dotenv()
 
-app = FastAPI(title="LLM Router", version="0.2.1")
+app = FastAPI(title="LLM Router", version="0.3.0")
 
-# Metrics storage
-metrics_lock = threading.Lock()
-metrics = {
-    "requests_total": 0,
-    "requests_success": 0,
-    "requests_failed": 0,
-    "model_usage": defaultdict(int),
-    "category_usage": defaultdict(int),
-    "total_latency_ms": 0,
-    "recent_requests": []  # Last 100 requests
-}
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
 
-# Configuration
+# OpenRouter (provider cible pour les vrais appels LLM)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "openai/gpt-5-nano")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "z-ai/glm-5")
 
-# Modèles par catégorie (Phase 2)
-# "tools" = requêtes avec function calling → modèles qui le supportent bien
+# Routing mode: "ollama" | "api" | "hybrid" | "keywords"
+ROUTING_MODE = os.getenv("ROUTING_MODE", "hybrid")
+
+# Ollama config (pour routing LLM)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://192.168.1.168:11434")
+OLLAMA_ROUTER_MODEL = os.getenv("OLLAMA_ROUTER_MODEL", "qwen2.5:0.5b")
+
+# API config (pour routing LLM fallback)
+ROUTER_API_MODEL = os.getenv("ROUTER_API_MODEL", "qwen/qwen-2.5-0.5b")
+
+# Modèles par catégorie (Phase 2 - fallback)
 MODEL_MAPPINGS = {
     "tools": ["openrouter/aurora-alpha", "moonshotai/kimi-k2.5", "z-ai/glm-5"],
     "code": ["z-ai/glm-5", "openrouter/aurora-alpha", "openai/gpt-4o-mini"],
@@ -45,20 +52,65 @@ MODEL_MAPPINGS = {
     "conversation": ["z-ai/glm-5", "openai/gpt-4o-mini", "openrouter/aurora-alpha"]
 }
 
-# Mots-clés pour détection de catégorie
+# Keywords pour fallback
 KEYWORDS = {
     "code": ["code", "python", "javascript", "function", "class", "def ", "import ", "bug", "debug", "error", "refactor", "api", "http", "json", "sql", "file", "script", "terminal", "git", "commit", "push", "pull", "react", "vue", "node", "typescript", "java", "c++", "rust", "go", "write code", "create function", "fix ", "solve"],
     "reasoning": ["why", "how", "explain", "analyze", "think", "reason", "prove", "math", "calculate", "solution", "logic", "problem", "determine", "compare", "differentiate", "evaluate", "assess", "complex", "research", "study", "understand", "concept", "theory"],
-    "conversation": ["hello", "hi", "hey", "thanks", "thank you", "please", "sorry", "yes", "no", "ok", "okay", "sure", "what", "who", "when", "where", "天气", "weather", "news", "info", "help"]
+    "conversation": ["hello", "hi", "hey", "thanks", "thank you", "please", "sorry", "yes", "no", "ok", "okay", "sure", "what", "who", "when", "where", "weather", "news", "info", "help"]
 }
 
-# Messages courts continuation
-SHORT_CONTINUATION = [r"^ok$", r"^okay$", r"^yes$", r"^no$", r"^thanks?$", r"^please$", r"^sure$", r"^right$", r"^got it$", r"^cool$", r"^nice$", r"^[\u4e00-\u9fff]+$", r"^[a-zA-Z]{1,3}$"]
+SHORT_CONTINUATION = [r"^ok$", r"^okay$", r"^yes$", r"^no$", r"^thanks?$", r"^please$", r"^sure$", r"^right$", r"^got it$", r"^cool$", r"^nice$", r"^[a-zA-Z]{1,3}$"]
 
-# Store current model per session
+# Session state
 current_model_per_session: Dict[str, str] = {}
 
-# Pydantic models
+# =============================================================================
+# METRICS
+# =============================================================================
+
+metrics_lock = threading.Lock()
+metrics = {
+    "requests_total": 0,
+    "requests_success": 0,
+    "requests_failed": 0,
+    "model_usage": defaultdict(int),
+    "category_usage": defaultdict(int),
+    "routing_mode_usage": defaultdict(int),
+    "total_latency_ms": 0,
+    "recent_requests": []
+}
+
+def track_request(category: str, model: str, latency_ms: float, success: bool, 
+                  routing_mode: str = "keywords", error: str = None):
+    with metrics_lock:
+        metrics["requests_total"] += 1
+        if success:
+            metrics["requests_success"] += 1
+        else:
+            metrics["requests_failed"] += 1
+        metrics["model_usage"][model] += 1
+        metrics["category_usage"][category] += 1
+        metrics["routing_mode_usage"][routing_mode] += 1
+        metrics["total_latency_ms"] += latency_ms
+        
+        entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "category": category,
+            "model": model,
+            "latency_ms": round(latency_ms, 2),
+            "success": success,
+            "routing_mode": routing_mode
+        }
+        if error:
+            entry["error"] = error
+        metrics["recent_requests"].append(entry)
+        if len(metrics["recent_requests"]) > 100:
+            metrics["recent_requests"] = metrics["recent_requests"][-100:]
+
+# =============================================================================
+# PYDANTIC MODELS
+# =============================================================================
+
 class Message(BaseModel):
     role: str
     content: str
@@ -79,7 +131,26 @@ class ChatCompletionRequest(BaseModel):
     tools: Optional[List[Dict[str, Any]]] = None
     tool_choice: Optional[Any] = None
 
-def detect_category(message: str) -> str:
+# =============================================================================
+# ROUTING LOGIC
+# =============================================================================
+
+ROUTER_PROMPT = """Tu es un routeur de modèles LLM. Analyse la requête et choisis la meilleure catégorie.
+
+Réponds UNIQUEMENT avec un mot: code, reasoning, conversation, ou tools
+
+Règles:
+- tools: si la requête nécessite des appels de fonction/outils
+- code: pour écrire, corriger, expliquer du code
+- reasoning: pour analyser, raisonner, expliquer un concept complexe
+- conversation: pour les discussions simples, questions rapides
+
+Requête: {message}
+
+Catégorie:"""
+
+def detect_category_keywords(message: str) -> str:
+    """Phase 2: Détection par keywords"""
     message_lower = message.lower()
     for keyword in KEYWORDS["code"]:
         if keyword in message_lower:
@@ -99,10 +170,80 @@ def is_continuation(message: str) -> bool:
             return True
     return False
 
-def route_message(messages: List[Dict], session_id: str, return_category: bool = False) -> str:
-    if not messages:
-        return DEFAULT_MODEL if not return_category else ("conversation", DEFAULT_MODEL)
+async def route_with_ollama(message: str) -> Tuple[str, str]:
+    """Route via Ollama (LLM local)"""
+    prompt = ROUTER_PROMPT.format(message=message[:500])
     
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": OLLAMA_ROUTER_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 10
+                    }
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            category = result.get("response", "").strip().lower()
+            
+            # Valider la catégorie
+            valid = ["code", "reasoning", "conversation", "tools"]
+            if category in valid:
+                return category, "ollama"
+            return "conversation", "ollama"
+        except Exception as e:
+            print(f"Ollama routing failed: {e}")
+            raise
+
+async def route_with_api(message: str) -> Tuple[str, str]:
+    """Route via API (OpenRouter)"""
+    prompt = ROUTER_PROMPT.format(message=message[:500])
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": ROUTER_API_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 10,
+                    "temperature": 0.1
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            category = result["choices"][0]["message"]["content"].strip().lower()
+            
+            valid = ["code", "reasoning", "conversation", "tools"]
+            if category in valid:
+                return category, "api"
+            return "conversation", "api"
+        except Exception as e:
+            print(f"API routing failed: {e}")
+            raise
+
+async def route_message(messages: List[Dict], session_id: str, has_tools: bool = False) -> Tuple[str, str]:
+    """
+    Route le message et retourne (category, routing_mode)
+    """
+    if not messages:
+        return "conversation", "none"
+    
+    # Si tools présents, catégorie tools
+    if has_tools:
+        return "tools", "direct"
+    
+    # Dernier message utilisateur
     last_user_msg = None
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -110,48 +251,51 @@ def route_message(messages: List[Dict], session_id: str, return_category: bool =
             break
     
     if not last_user_msg:
-        return DEFAULT_MODEL if not return_category else ("conversation", DEFAULT_MODEL)
+        return "conversation", "none"
     
-    # Phase 2: Détection de continuité
+    # Continuation courte
     if is_continuation(last_user_msg) and session_id in current_model_per_session:
-        return current_model_per_session[session_id] if not return_category else ("conversation", current_model_per_session[session_id])
+        return "conversation", "continuation"
     
-    # Phase 2: Détection de catégorie
-    category = detect_category(last_user_msg)
-    model = MODEL_MAPPINGS.get(category, MODEL_MAPPINGS["conversation"])[0]
-    current_model_per_session[session_id] = model
+    # Phase 3: Routing LLM
+    if ROUTING_MODE in ["ollama", "hybrid"]:
+        try:
+            category, mode = await route_with_ollama(last_user_msg)
+            if ROUTING_MODE == "ollama":
+                return category, mode
+            # hybrid: on garde le résultat mais on a le fallback API si besoin
+            return category, mode
+        except:
+            pass
     
-    return category if return_category else model
+    if ROUTING_MODE in ["api", "hybrid"]:
+        try:
+            category, mode = await route_with_api(last_user_msg)
+            return category, mode
+        except:
+            pass
+    
+    # Fallback: keywords (Phase 2)
+    category = detect_category_keywords(last_user_msg)
+    return category, "keywords"
 
-def track_request(category: str, model: str, latency_ms: float, success: bool, error: str = None):
-    """Track request metrics"""
-    with metrics_lock:
-        metrics["requests_total"] += 1
-        if success:
-            metrics["requests_success"] += 1
-        else:
-            metrics["requests_failed"] += 1
-        metrics["model_usage"][model] += 1
-        metrics["category_usage"][category] += 1
-        metrics["total_latency_ms"] += latency_ms
-        
-        # Keep last 100 requests
-        entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "category": category,
-            "model": model,
-            "latency_ms": round(latency_ms, 2),
-            "success": success
-        }
-        if error:
-            entry["error"] = error
-        metrics["recent_requests"].append(entry)
-        if len(metrics["recent_requests"]) > 100:
-            metrics["recent_requests"] = metrics["recent_requests"][-100:]
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "llm-router",
+        "version": "0.3.0",
+        "routing_mode": ROUTING_MODE,
+        "ollama_url": OLLAMA_BASE_URL,
+        "ollama_model": OLLAMA_ROUTER_MODEL
+    }
 
 @app.get("/metrics")
 async def get_metrics():
-    """Get routing metrics"""
     with metrics_lock:
         avg_latency = (
             metrics["total_latency_ms"] / metrics["requests_total"]
@@ -166,56 +310,53 @@ async def get_metrics():
             "avg_latency_ms": round(avg_latency, 2),
             "model_distribution": dict(metrics["model_usage"]),
             "category_distribution": dict(metrics["category_usage"]),
-            "recent_requests": metrics["recent_requests"][-10:]  # Last 10
+            "routing_mode_distribution": dict(metrics["routing_mode_usage"]),
+            "config": {
+                "routing_mode": ROUTING_MODE,
+                "ollama_url": OLLAMA_BASE_URL,
+                "ollama_model": OLLAMA_ROUTER_MODEL
+            },
+            "recent_requests": metrics["recent_requests"][-10:]
         }
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "service": "llm-router", "version": "0.2.1"}
-
-@app.get("/models")
-async def list_models():
-    return {"data": [{"id": "router", "object": "model", "created": 1700000000, "owned_by": "local"}]}
-
-# Phase 2 enable/disable flag
-PHASE2_ENABLED = True  # Enabled for routing
+@app.get("/config")
+async def get_config():
+    return {
+        "routing_mode": ROUTING_MODE,
+        "ollama": {
+            "base_url": OLLAMA_BASE_URL,
+            "model": OLLAMA_ROUTER_MODEL
+        },
+        "api": {
+            "model": ROUTER_API_MODEL
+        },
+        "model_mappings": MODEL_MAPPINGS
+    }
 
 @app.post("/v1/chat/completions")
-@app.post("/chat/completions")  # Alias for OpenClaw compatibility
+@app.post("/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
     
     start_time = time.time()
     
-    # Detect category - tools take priority
+    # Détection catégorie
+    session_id = request.user or "default_session"
     has_tools = request.tools is not None and len(request.tools) > 0
     
-    if PHASE2_ENABLED:
-        session_id = request.user or "default_session"
-        
-        # If tools present, use tools category (models that support function calling)
-        if has_tools:
-            category = "tools"
-            models_to_try = MODEL_MAPPINGS["tools"]
-        else:
-            # First call route_message to update session state and get primary model
-            primary_model = route_message([msg.model_dump() for msg in request.messages], session_id)
-            # Get category from messages for fallback models
-            last_user_msg = ""
-            for msg in reversed([msg.model_dump() for msg in request.messages]):
-                if msg.get("role") == "user":
-                    last_user_msg = msg.get("content", "")
-                    break
-            category = detect_category(last_user_msg) if last_user_msg else "conversation"
-            models_to_try = MODEL_MAPPINGS.get(category, MODEL_MAPPINGS["conversation"])
-    else:
-        category = "conversation"
-        models_to_try = [request.model if request.model else DEFAULT_MODEL]
+    category, routing_mode = await route_message(
+        [msg.model_dump() for msg in request.messages],
+        session_id,
+        has_tools
+    )
     
-    # Try each model in order (fallback)
+    models_to_try = MODEL_MAPPINGS.get(category, MODEL_MAPPINGS["conversation"])
+    
+    # Try each model
     last_error = None
     last_model_tried = None
+    
     for selected_model in models_to_try:
         last_model_tried = selected_model
         headers = {
@@ -252,21 +393,25 @@ async def chat_completions(request: ChatCompletionRequest):
                 )
                 response.raise_for_status()
                 
-                # Track success
                 latency_ms = (time.time() - start_time) * 1000
-                track_request(category, selected_model, latency_ms, True)
+                track_request(category, selected_model, latency_ms, True, routing_mode)
+                
+                # Update session model
+                current_model_per_session[session_id] = selected_model
                 
                 return response.json()
             except Exception as e:
                 last_error = str(e)
-                continue  # Try next model
+                continue
     
-    # All models failed - track failure
+    # All failed
     latency_ms = (time.time() - start_time) * 1000
-    track_request(category, last_model_tried or "unknown", latency_ms, False, last_error)
+    track_request(category, last_model_tried or "unknown", latency_ms, False, routing_mode, last_error)
     
     raise HTTPException(status_code=500, detail=f"All models failed. Last error: {last_error}")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3456)
+@app.on_event("startup")
+async def startup_event():
+    print(f"LLM Router v0.3.0 started")
+    print(f"Routing mode: {ROUTING_MODE}")
+    print(f"Ollama: {OLLAMA_BASE_URL} ({OLLAMA_ROUTER_MODEL})")

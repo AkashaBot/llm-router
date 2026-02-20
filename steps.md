@@ -20,9 +20,9 @@
 
 ## Phase 3: Router LLM
 
-- [ ] **3.1** Intégrer petit modèle local (Qwen-0.5B) ou API légère
-- [ ] **3.2** Implémenter le prompt de routing
-- [ ] **3.3** Ajouter métriques (cost, latence, utilisation)
+- [x] **3.1** Intégrer Ollama pour routing (qwen2.5:0.5b)
+- [x] **3.2** Implémenter le prompt de routing
+- [ ] **3.3** Ajouter métriques de coût estimé
 - [ ] **3.4** Ajouter circuit breaker
 - [ ] **3.5** Tests de charge et validation
 

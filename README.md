@@ -8,7 +8,7 @@ Service de routage intelligent pour les requêtes LLM. Choix automatique du meil
 |-------|-------------|--------|
 | Phase 1 | Forward-only vers OpenRouter | ✅ Complète |
 | Phase 2 | Routing par keywords + monitoring | ✅ Complète |
-| Phase 3 | Routing LLM-based (Qwen local) | 🔜 À faire |
+| Phase 3 | Routing LLM-based (Ollama/API) | 🔄 En cours |
 
 ## Démarrage rapide
 
