@@ -159,8 +159,10 @@ SHORT_CONTINUATION = [r"^ok$", r"^okay$", r"^yes$", r"^no$", r"^thanks?$", r"^pl
 current_model_per_session: Dict[str, str] = {}
 
 # =============================================================================
-# CIRCUIT BREAKER
+# CIRCUIT BREAKER with Persistence
 # =============================================================================
+
+CIRCUIT_BREAKER_FILE = os.path.join(os.path.dirname(__file__), "circuit_breaker_state.json")
 
 class CircuitBreaker:
     def __init__(self, failure_threshold: int = 3, recovery_timeout_sec: int = 300):
@@ -170,6 +172,34 @@ class CircuitBreaker:
         self.last_failure: Dict[str, float] = {}
         self.open_circuits: Dict[str, bool] = {}
         self.lock = threading.Lock()
+        self._load_state()
+    
+    def _load_state(self):
+        """Load circuit breaker state from file"""
+        if os.path.exists(CIRCUIT_BREAKER_FILE):
+            try:
+                with open(CIRCUIT_BREAKER_FILE, "r") as f:
+                    state = json.load(f)
+                self.failures = defaultdict(int, state.get("failures", {}))
+                self.last_failure = {k: float(v) for k, v in state.get("last_failure", {}).items()}
+                self.open_circuits = state.get("open_circuits", {})
+                print(f"Circuit breaker state loaded from {CIRCUIT_BREAKER_FILE}")
+            except Exception as e:
+                print(f"Error loading circuit breaker state: {e}")
+    
+    def _save_state(self):
+        """Save circuit breaker state to file"""
+        try:
+            state = {
+                "failures": dict(self.failures),
+                "last_failure": self.last_failure,
+                "open_circuits": self.open_circuits,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            with open(CIRCUIT_BREAKER_FILE, "w") as f:
+                json.dump(state, f, indent=2)
+        except Exception as e:
+            print(f"Error saving circuit breaker state: {e}")
     
     def record_failure(self, model: str):
         with self.lock:
@@ -178,11 +208,13 @@ class CircuitBreaker:
             if self.failures[model] >= self.failure_threshold:
                 self.open_circuits[model] = True
                 print(f"Circuit OPEN for {model} (failures: {self.failures[model]})")
+            self._save_state()
     
     def record_success(self, model: str):
         with self.lock:
             self.failures[model] = 0
             self.open_circuits[model] = False
+            self._save_state()
     
     def is_available(self, model: str) -> bool:
         with self.lock:
@@ -204,8 +236,20 @@ class CircuitBreaker:
                 "failures": dict(self.failures),
                 "open_circuits": {k: v for k, v in self.open_circuits.items() if v},
                 "last_failure": {k: datetime.fromtimestamp(v).isoformat() 
-                                 for k, v in self.last_failure.items()}
+                                 for k, v in self.last_failure.items()},
+                "config": {
+                    "failure_threshold": self.failure_threshold,
+                    "recovery_timeout_sec": self.recovery_timeout
+                }
             }
+    
+    def reset_all(self):
+        """Reset all circuits"""
+        with self.lock:
+            self.failures.clear()
+            self.last_failure.clear()
+            self.open_circuits.clear()
+            self._save_state()
 
 circuit_breaker = CircuitBreaker()
 
@@ -562,6 +606,12 @@ async def reset_circuit(model: str):
     """Manually reset circuit breaker for a model"""
     circuit_breaker.record_success(model)
     return {"status": "ok", "model": model}
+
+@app.post("/circuit-breaker/reset-all")
+async def reset_all_circuits():
+    """Reset all circuit breakers"""
+    circuit_breaker.reset_all()
+    return {"status": "ok", "message": "All circuits reset"}
 
 @app.post("/v1/chat/completions")
 @app.post("/chat/completions")
